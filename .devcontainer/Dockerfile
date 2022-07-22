@@ -1,0 +1,139 @@
+# Copyright 2019 The MediaPipe Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# FROM ubuntu:18.04 as base
+FROM nvidia/cuda:11.3.1-cudnn8-devel-ubuntu20.04 as base
+
+WORKDIR /io
+WORKDIR /mediapipe
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+#added for dev in China
+ENV http_proxy="http://192.168.1.10:31083"
+ENV https_proxy="http://192.168.1.10:31083"
+RUN cp /etc/apt/sources.list /etc/apt/sourses.list.backup \
+    && sed -i -e 's/http\(s\)*:\(.*\)\/ubuntu/http:\/\/mirrors.ustc.edu.cn\/ubuntu/g' /etc/apt/sources.list \
+    && apt-get update
+
+
+
+FROM base as dev
+
+RUN apt-get install -y --no-install-recommends \
+        build-essential \
+        gcc-8 g++-8 \
+        ca-certificates \
+        curl \
+        ffmpeg \
+        git \
+        wget \
+        unzip \
+        python3-dev \
+        python3-opencv \
+        python3-pip 
+
+#added for dev in China
+RUN pip3 install -i https://pypi.mirrors.ustc.edu.cn/simple/  -U pip
+RUN pip config set --global global.index-url https://pypi.mirrors.ustc.edu.cn/simple/
+RUN pip config set --global install.trusted-host pypi.mirrors.ustc.edu.cn
+
+
+
+FROM dev as dev2
+
+RUN apt-get install -y --no-install-recommends \
+        libopencv-core-dev \
+        libopencv-highgui-dev \
+        libopencv-imgproc-dev \
+        libopencv-video-dev \
+        libopencv-calib3d-dev \
+        libopencv-features2d-dev \
+        software-properties-common && \
+    add-apt-repository -y ppa:openjdk-r/ppa && \
+    apt-get update && apt-get install -y openjdk-8-jdk && \
+    apt-get install -y mesa-common-dev libegl1-mesa-dev libgles2-mesa-dev && \
+    apt-get install -y mesa-utils && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 100 --slave /usr/bin/g++ g++ /usr/bin/g++-8
+RUN pip3 install --upgrade setuptools
+RUN pip3 install wheel
+RUN pip3 install future
+RUN pip3 install six==1.14.0
+RUN pip3 install tensorflow==2.2.0
+# RUN pip3 install tensorflow
+# RUN pip3 install tensorflow-gpu
+RUN pip3 install tf_slim
+
+RUN ln -s /usr/bin/python3 /usr/bin/python
+
+
+FROM dev2 as dev_bazel
+# ENV HTTP_PROXY="http://192.168.1.10:31083"
+# ENV HTTPS_PROXY="http://192.168.1.10:31083"
+# Install bazel
+ARG BAZEL_VERSION=5.2.0
+RUN mkdir /bazel && \
+    wget --no-check-certificate -O /bazel/installer.sh "https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/b\
+azel-${BAZEL_VERSION}-installer-linux-x86_64.sh" && \
+    wget --no-check-certificate -O  /bazel/LICENSE.txt "https://raw.githubusercontent.com/bazelbuild/bazel/master/LICENSE" && \
+    chmod +x /bazel/installer.sh && \
+    /bazel/installer.sh  && \
+    rm -f /bazel/installer.sh
+
+RUN apt-get update
+#RUN apt install -y --no-install-recommends --fix-missing nodejs npm
+#RUN npm install -g @bazel/bazelisk
+
+RUN apt-get install -y --no-install-recommends sudo
+#RUN apt-get install -y --no-install-recommends \
+#    mesa-common-dev libegl1-mesa-dev libgles2-mesa-dev mesa-utils
+
+
+
+# COPY . /mediapipe/
+
+FROM  dev_bazel as dev_bazel_for_vscode
+
+# RUN adduser vscode \
+#     # && usermod -p vscode -aG sudo vscode 
+#     && usermod -aG sudo -p tGeC5KGetbxbI vscode 
+
+# RUN echo Y | bash /workspaces/SportApp/mediapipe/setup_android_sdk_and_ndk.sh
+
+# If we want the docker image to contain the pre-built object_detection_offline_demo binary, do the following
+# RUN bazel build -c opt --define MEDIAPIPE_DISABLE_GPU=1 mediapipe/examples/desktop/demo:object_detection_tensorflow_demo
+
+RUN apt-get install -y --no-install-recommends \
+    sysstat
+
+# create a non-root user
+ARG USER_ID=1000
+ARG USERNAME=vscode
+RUN useradd -m --no-log-init --system  --uid ${USER_ID} $USERNAME -g sudo -s /bin/bash
+RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+# persist cli history for the non-root user
+RUN SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhistory/.bash_history" \
+    && mkdir /commandhistory \
+    && touch /commandhistory/.bash_history \
+    && chown -R $USERNAME /commandhistory \
+    && echo $SNIPPET >> "/home/$USERNAME/.bashrc"
+
+USER $USERNAME
+WORKDIR /home/$USERNAME
+
+ENV PATH="/home/$USERNAME/.local/bin:${PATH}"

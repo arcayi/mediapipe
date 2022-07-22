@@ -1,0 +1,41 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the README at:
+// https://github.com/microsoft/vscode-dev-containers/tree/v0.238.0/containers/ubuntu
+{
+	"name": "mediapipe",
+	"build": {
+		"dockerfile": "Dockerfile",
+		// Update 'VARIANT' to pick an Ubuntu version: jammy / ubuntu-22.04, focal / ubuntu-20.04, bionic /ubuntu-18.04
+		// Use ubuntu-22.04 or ubuntu-18.04 on local arm64/Apple Silicon.
+		"args": {
+			"VARIANT": "ubuntu-18.04"
+		}
+	},
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": [],
+	// Use 'postCreateCommand' to run commands after the container is created.
+	// "postCreateCommand": "uname -a",
+	"postCreateCommand": "bash .devcontainer/postCreateCommand.sh",
+	// Comment out to connect as root instead. More info: https://aka.ms/vscode-remote/containers/non-root.
+	"remoteUser": "vscode",
+
+	"runArgs": [
+		"--gpus=all",
+		"--privileged"
+	],
+
+	"mounts": [
+		"source=projectname-bashhistory,target=/commandhistory,type=volume",
+		"source=projectname-home,target=/home,type=volume",
+		"source=D:/Git_Repository/test_sport_counter/videos,target=/workspaces/videos,type=bind,consistency=cached",
+		// "source=D:/Git_Repository/opencv,target=/workspaces/opencv,type=bind,consistency=cached",
+		// "source=D:/Git_Repository/opencv_contrib,target=/workspaces/opencv_contrib,type=bind,consistency=cached"
+	],
+	
+	"containerEnv": {
+		"all_proxy": "http://192.168.1.10:31083",
+		"http_proxy": "http://192.168.1.10:31083",
+		"https_proxy": "http://192.168.1.10:31083",
+		"DISPLAY": "192.168.1.10:0.0"
+		// "ANDROID_NDK_HOME": "/root/Android/Sdk/ndk-bundle/android-ndk-r21"
+	}
+}

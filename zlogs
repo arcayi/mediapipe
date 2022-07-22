@@ -1,0 +1,50 @@
+# 准备环境
+export all_proxy=http://192.168.1.10:31083
+export http_proxy=http://192.168.1.10:31083
+export https_proxy=http://192.168.1.10:31083
+export DISPLAY=192.168.1.10:0.0
+glxinfo | grep -i opengl
+env |grep -i proxy
+
+# CUDA toolkit
+wget https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/cuda-wsl-ubuntu.pin
+sudo mv cuda-wsl-ubuntu.pin /etc/apt/preferences.d/cuda-repository-pin-600
+wget https://developer.download.nvidia.com/compute/cuda/11.7.0/local_installers/cuda-repo-wsl-ubuntu-11-7-local_11.7.0-1_amd64.deb
+sudo dpkg -i cuda-repo-wsl-ubuntu-11-7-local_11.7.0-1_amd64.deb
+sudo cp /var/cuda-repo-wsl-ubuntu-11-7-local/cuda-*-keyring.gpg /usr/share/keyrings/
+sudo apt-get update
+sudo apt-get -y install cuda
+
+# Build
+pwd # /workspaces/mediapipe.0
+# opencv
+./setup_opencv.sh 
+# Android SDK(不知道有没有用)
+./setup_android_sdk_and_ndk.sh # optional?
+
+bazel run --define MEDIAPIPE_DISABLE_GPU=1 mediapipe/examples/desktop/hello_world:hello_world
+# 通过Docker运行的话记得带上参数 "--gpus=all"
+bazel clean --expunge
+bazel build -c opt --copt -DMESA_EGL_NO_X11_HEADERS --copt -DEGL_NO_X11   mediapipe/examples/desktop/pose_tracking:pose_tracking_gpu
+GLOG_logtostderr=1 bazel-bin/mediapipe/examples/desktop/pose_tracking/pose_tracking_gpu --calculator_graph_config_file=mediapipe/graphs/pose_tracking/pose_tracking_gpu.pbtxt  --input_video_path=/workspaces/videos/PushUps/102670156-1-80.flv --noplayback
+
+bazel build -c opt --copt -DMESA_EGL_NO_X11_HEADERS --copt -DEGL_NO_X11   mediapipe/examples/desktop/hand_tracking:hand_tracking_gpu
+GLOG_logtostderr=1 bazel-bin/mediapipe/examples/desktop/hand_tracking/hand_tracking_gpu --calculator_graph_config_file=mediapipe/graphs/hand_tracking/hand_tracking_mobile.pbtxt
+
+bazel build --copt -DMESA_EGL_NO_X11_HEADERS --copt -DEGL_NO_X11 mediapipe/examples/desktop/pose_tracking:pose_tracking_gpu
+
+bazel build --copt -DMESA_EGL_NO_X11_HEADERS --copt -DEGL_NO_X11 --copt -DMEDIAPIPE_DISABLE_GL_COMPUTE  mediapipe/examples/desktop/pose_tracking:pose_tracking_gpu
+
+
+
+
+export PATH=/usr/local/cuda/bin${PATH:+:${PATH}}
+export LD_LIBRARY_PATH=/usr/local/cuda/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}
+sudo ldconfig
+
+bazel build -c opt --config=cuda --spawn_strategy=local \
+    --define no_aws_support=true --copt -DMESA_EGL_NO_X11_HEADERS \
+    mediapipe/examples/desktop/object_detection:object_detection_tensorflow
+
+
+        # Ex: libegl1-mesa-dev libgles2-mesa-dev, or libegl1-nvidia libgles2-nvidia, etc...

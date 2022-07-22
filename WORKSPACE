@@ -191,7 +191,7 @@ http_archive(
 new_local_repository(
     name = "linux_opencv",
     build_file = "@//third_party:opencv_linux.BUILD",
-    path = "/usr",
+    path = "/usr/local",
 )
 
 new_local_repository(
@@ -357,10 +357,15 @@ maven_install(
         "org.hamcrest:hamcrest-library:1.3",
     ],
     repositories = [
-        "https://maven.google.com",
+        # "https://maven.google.com",
+        # "https://dl.google.com/dl/android/maven2",
+        # "https://repo1.maven.org/maven2",
+        # "https://jcenter.bintray.com",
+        "https://maven.aliyun.com/repository/google",
+        "https://maven.aliyun.com/repository/gradle-plugin",
+        "https://maven.aliyun.com/repository/central",
         "https://dl.google.com/dl/android/maven2",
-        "https://repo1.maven.org/maven2",
-        "https://jcenter.bintray.com",
+        "https://maven.aliyun.com/repository/public",
     ],
     fetch_sources = True,
     version_conflict_policy = "pinned",
@@ -417,3 +422,7 @@ libedgetpu_dependencies()
 
 load("@coral_crosstool//:configure.bzl", "cc_crosstool")
 cc_crosstool(name = "crosstool")
+
+
+android_sdk_repository(name = "androidsdk", path = "/home/vscode/Android/Sdk")
+android_ndk_repository(name = "androidndk", api_level=21, path = "/home/vscode/Android/Sdk/ndk-bundle/android-ndk-r21")
