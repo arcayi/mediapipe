@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# FROM ubuntu:18.04 as base
-FROM nvidia/cuda:11.3.1-cudnn8-devel-ubuntu20.04 as base
+FROM ubuntu:20.04 as base
+# FROM nvidia/cuda:11.3.1-cudnn8-devel-ubuntu20.04 as base
 
 WORKDIR /io
 WORKDIR /mediapipe

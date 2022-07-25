@@ -5,3 +5,6 @@ mediapipe/provisioning_profile.mobileprovision
 .configure.bazelrc
 .user.bazelrc
 .vscode/VC.*
+tensorflow/
+cuda-repo-wsl-ubuntu-11-7-local_11.7.0-1_amd64.deb
+cudnn-local-repo-ubuntu2004-8.4.1.50_1.0-1_amd64.deb

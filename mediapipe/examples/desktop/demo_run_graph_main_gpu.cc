@@ -43,8 +43,14 @@ ABSL_FLAG(std::string, input_video_path, "",
 ABSL_FLAG(std::string, output_video_path, "",
           "Full path of where to save result (.mp4 only). "
           "If not provided, show result in a window.");
+ABSL_FLAG(int, interval, -1,
+          "Interval between each frame processed. "
+          "if < 0, there will be no wait");
+ABSL_FLAG(bool, playback, true,
+          "Shall the output video frame played back. ");
 
-absl::Status RunMPPGraph() {
+absl::Status RunMPPGraph()
+{
   std::string calculator_graph_config_contents;
   MP_RETURN_IF_ERROR(mediapipe::file::GetContents(
       absl::GetFlag(FLAGS_calculator_graph_config_file),
@@ -68,16 +74,22 @@ absl::Status RunMPPGraph() {
   LOG(INFO) << "Initialize the camera or load the video.";
   cv::VideoCapture capture;
   const bool load_video = !absl::GetFlag(FLAGS_input_video_path).empty();
-  if (load_video) {
+  if (load_video)
+  {
     capture.open(absl::GetFlag(FLAGS_input_video_path));
-  } else {
+  }
+  else
+  {
     capture.open(0);
   }
   RET_CHECK(capture.isOpened());
 
   cv::VideoWriter writer;
   const bool save_video = !absl::GetFlag(FLAGS_output_video_path).empty();
-  if (!save_video) {
+  const bool playback = absl::GetFlag(FLAGS_playback);
+  const bool interval = absl::GetFlag(FLAGS_interval);
+  if (playback)
+  {
     cv::namedWindow(kWindowName, /*flags=WINDOW_AUTOSIZE*/ 1);
 #if (CV_MAJOR_VERSION >= 3) && (CV_MINOR_VERSION >= 2)
     capture.set(cv::CAP_PROP_FRAME_WIDTH, 640);
@@ -93,12 +105,15 @@ absl::Status RunMPPGraph() {
 
   LOG(INFO) << "Start grabbing and processing frames.";
   bool grab_frames = true;
-  while (grab_frames) {
+  while (grab_frames)
+  {
     // Capture opencv camera or video frame.
     cv::Mat camera_frame_raw;
     capture >> camera_frame_raw;
-    if (camera_frame_raw.empty()) {
-      if (!load_video) {
+    if (camera_frame_raw.empty())
+    {
+      if (!load_video)
+      {
         LOG(INFO) << "Ignore empty frames from camera.";
         continue;
       }
@@ -107,7 +122,8 @@ absl::Status RunMPPGraph() {
     }
     cv::Mat camera_frame;
     cv::cvtColor(camera_frame_raw, camera_frame, cv::COLOR_BGR2RGBA);
-    if (!load_video) {
+    if (!load_video)
+    {
       cv::flip(camera_frame, camera_frame, /*flipcode=HORIZONTAL*/ 1);
     }
 
@@ -123,7 +139,8 @@ absl::Status RunMPPGraph() {
         (double)cv::getTickCount() / (double)cv::getTickFrequency() * 1e6;
     MP_RETURN_IF_ERROR(
         gpu_helper.RunInGlContext([&input_frame, &frame_timestamp_us, &graph,
-                                   &gpu_helper]() -> absl::Status {
+                                   &gpu_helper]() -> absl::Status
+                                  {
           // Convert ImageFrame to GpuBuffer.
           auto texture = gpu_helper.CreateSourceTexture(*input_frame.get());
           auto gpu_frame = texture.GetFrame<mediapipe::GpuBuffer>();
@@ -133,18 +150,19 @@ absl::Status RunMPPGraph() {
           MP_RETURN_IF_ERROR(graph.AddPacketToInputStream(
               kInputStream, mediapipe::Adopt(gpu_frame.release())
                                 .At(mediapipe::Timestamp(frame_timestamp_us))));
-          return absl::OkStatus();
-        }));
+          return absl::OkStatus(); }));
 
     // Get the graph result packet, or stop if that fails.
     mediapipe::Packet packet;
-    if (!poller.Next(&packet)) break;
+    if (!poller.Next(&packet))
+      break;
     std::unique_ptr<mediapipe::ImageFrame> output_frame;
 
     // Convert GpuBuffer to ImageFrame.
     MP_RETURN_IF_ERROR(gpu_helper.RunInGlContext(
-        [&packet, &output_frame, &gpu_helper]() -> absl::Status {
-          auto& gpu_frame = packet.Get<mediapipe::GpuBuffer>();
+        [&packet, &output_frame, &gpu_helper]() -> absl::Status
+        {
+          auto &gpu_frame = packet.Get<mediapipe::GpuBuffer>();
           auto texture = gpu_helper.CreateSourceTexture(gpu_frame);
           output_frame = absl::make_unique<mediapipe::ImageFrame>(
               mediapipe::ImageFormatForGpuBufferFormat(gpu_frame.format()),
@@ -160,43 +178,59 @@ absl::Status RunMPPGraph() {
           return absl::OkStatus();
         }));
 
-    // Convert back to opencv for display or saving.
-    cv::Mat output_frame_mat = mediapipe::formats::MatView(output_frame.get());
-    if (output_frame_mat.channels() == 4)
-      cv::cvtColor(output_frame_mat, output_frame_mat, cv::COLOR_RGBA2BGR);
-    else
-      cv::cvtColor(output_frame_mat, output_frame_mat, cv::COLOR_RGB2BGR);
-    if (save_video) {
-      if (!writer.isOpened()) {
-        LOG(INFO) << "Prepare video writer.";
-        writer.open(absl::GetFlag(FLAGS_output_video_path),
-                    mediapipe::fourcc('a', 'v', 'c', '1'),  // .mp4
-                    capture.get(cv::CAP_PROP_FPS), output_frame_mat.size());
-        RET_CHECK(writer.isOpened());
+    if (save_video || playback)
+    {
+      // Convert back to opencv for display or saving.
+      cv::Mat output_frame_mat = mediapipe::formats::MatView(output_frame.get());
+      if (output_frame_mat.channels() == 4)
+        cv::cvtColor(output_frame_mat, output_frame_mat, cv::COLOR_RGBA2BGR);
+      else
+        cv::cvtColor(output_frame_mat, output_frame_mat, cv::COLOR_RGB2BGR);
+      if (save_video)
+      {
+        if (!writer.isOpened())
+        {
+          LOG(INFO) << "Prepare video writer.";
+          writer.open(absl::GetFlag(FLAGS_output_video_path),
+                      mediapipe::fourcc('a', 'v', 'c', '1'), // .mp4
+                      capture.get(cv::CAP_PROP_FPS), output_frame_mat.size());
+          RET_CHECK(writer.isOpened());
+        }
+        writer.write(output_frame_mat);
       }
-      writer.write(output_frame_mat);
-    } else {
-      cv::imshow(kWindowName, output_frame_mat);
-      // Press any key to exit.
-      const int pressed_key = cv::waitKey(5);
-      if (pressed_key >= 0 && pressed_key != 255) grab_frames = false;
+      else
+      {
+        cv::imshow(kWindowName, output_frame_mat);
+        // Press any key to exit.
+        if (interval >= 0)
+        {
+          const int pressed_key = cv::waitKey(interval);
+          if (pressed_key >= 0 && pressed_key != 255)
+            grab_frames = false;
+        }
+      }
     }
   }
 
   LOG(INFO) << "Shutting down.";
-  if (writer.isOpened()) writer.release();
+  if (writer.isOpened())
+    writer.release();
   MP_RETURN_IF_ERROR(graph.CloseInputStream(kInputStream));
   return graph.WaitUntilDone();
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv)
+{
   google::InitGoogleLogging(argv[0]);
   absl::ParseCommandLine(argc, argv);
   absl::Status run_status = RunMPPGraph();
-  if (!run_status.ok()) {
+  if (!run_status.ok())
+  {
     LOG(ERROR) << "Failed to run the graph: " << run_status.message();
     return EXIT_FAILURE;
-  } else {
+  }
+  else
+  {
     LOG(INFO) << "Success!";
   }
   return EXIT_SUCCESS;

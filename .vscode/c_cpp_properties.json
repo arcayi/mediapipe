@@ -7,9 +7,13 @@
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
-            "cStandard": "gnu17",
-            "cppStandard": "gnu++14",
-            "intelliSenseMode": "linux-gcc-x64"
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-gcc-x64",
+            "browse": {
+                "path": [],
+                "limitSymbolsToIncludedHeaders": false
+            }
         }
     ],
     "version": 4
